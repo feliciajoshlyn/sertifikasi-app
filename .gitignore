@@ -30,3 +30,7 @@ Thumbs.db
 !/tests/temp/.gitkeep
 /storage/logs/*.log
 .phpunit.result.cache
+GEMINI.md
+CLAUDE.md
+AGENTS.md
+docs/*.md
