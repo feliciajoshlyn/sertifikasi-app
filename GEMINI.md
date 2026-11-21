@@ -1,0 +1,9 @@
+# IMT UC SKKNI Certification - Pragmatic Laravel Rules
+
+1. **Architecture (J.620100.016.02):** Follow pragmatic Laravel MVC + Service (`Route -> Controller (validation) -> Service (business logic) -> Model (DB)`). Never put business logic or raw SQL in Controllers or Blade views.
+2. **Pragmatic OOP (J.620100.018.02):** Use clean visibility (`private`/`protected`/`public`), constructor dependency injection, and namespaces. Only use `extends` (inheritance) or `interface` when the case study naturally has multiple entity/strategy variations—do not over-engineer single-type CRUD.
+3. **Structured Programming (J.620100.016.02 & .017.02):** Put `declare(strict_types=1);` at the top of PHP files. Use explicit parameter and return types (`void` for procedures). Combine conditions with `&&`/`||`, use early returns, avoid empty `else` blocks, and demonstrate array sorting/filtering (`usort`, `array_filter`) in Services where relevant. Never leave dead commented code or unused imports.
+4. **PHPDoc (J.620100.023.02):** Every class and method must have a PHPDoc block explaining WHY it exists, plus `@param`, `@return`, and `@throws` tags.
+5. **MySQL & Migrations (J.620100.021.02):** Normalize tables (3NF), add `->index()` on lookup/foreign columns, and explicitly define `->onDelete('restrict')`, `'cascade'`, or `'set null'` on every foreign key. Include at least one explicit `JOIN` query in the Service/Model layer.
+6. **Testing & Debugging (J.620100.025.02 & .033.02):** Generate PHPUnit tests in `tests/Unit/` for every Service class covering normal, edge, and invalid cases.
+7. **Workflow:** Build one layer at a time (Migrations -> Models -> Services -> Controllers -> Blade -> Unit Tests). After generating each file, briefly list: (1) Which SKKNI unit it satisfies, and (2) One likely oral exam (*ujian lisan*) question.
