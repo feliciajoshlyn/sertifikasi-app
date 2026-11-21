@@ -1,19 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * Verifies entry navigation routing redirects unauthenticated visitors to the login screen.
+ */
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * Verify root path redirects guests to login and the login page renders HTTP 200.
+     *
+     * @return void
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_unauthenticated_root_redirects_to_login(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        $response->assertRedirect(route('login'));
+        $this->get(route('login'))->assertStatus(200);
     }
 }
