@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Models\Garage;
-use App\Models\Rental;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\RentalService;
@@ -16,8 +15,8 @@ use InvalidArgumentException;
 use Tests\TestCase;
 
 /**
- * Verifies RentalService booking creation, inline new vehicle atomicity, calendar-month limits,
- * EV battery charging rules, booking overlap guards, and historical-rate extensions.
+ * Check RentalService booking flows, inline new vehicle saving, calendar-month rules,
+ * EV charging calculation, overlap guards, and rental extensions.
  */
 class RentalServiceTest extends TestCase
 {
@@ -26,7 +25,7 @@ class RentalServiceTest extends TestCase
     private RentalService $rentalService;
 
     /**
-     * Initialize a fresh RentalService instance before each test.
+     * Prepare a fresh RentalService instance before each test.
      *
      * @return void
      */
@@ -37,7 +36,7 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Clear any mocked Carbon test clock after each test so dates never leak across test cases.
+     * Reset mocked Carbon test dates after each test so dates never leak to other tests.
      *
      * @return void
      */
@@ -48,11 +47,11 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Create an approved Penyewa account for rental test scenarios.
+     * Create a dummy approved Penyewa user for test bookings.
      *
-     * @param string $suffix Unique identifier suffix for email and NIK.
+     * @param string $suffix Unique suffix for email and NIK.
      *
-     * @return User Persisted Penyewa user model.
+     * @return User Saved Penyewa user model.
      */
     private function createRenter(string $suffix = '1'): User
     {
@@ -68,14 +67,14 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Create a vehicle record owned by the given renter for test scenarios.
+     * Create a dummy vehicle owned by a renter for test bookings.
      *
      * @param User        $renter          Owner user model.
      * @param string      $type            Vehicle type key.
      * @param string|null $plateNumber     Plate number (null for bicycles).
      * @param float|null  $batteryCapacity EV full capacity in kWh when applicable.
      *
-     * @return Vehicle Persisted Vehicle model.
+     * @return Vehicle Saved Vehicle model.
      */
     private function createVehicle(
         User $renter,
@@ -93,14 +92,14 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Create an available garage record for test scenarios.
+     * Create a dummy available garage unit for test bookings.
      *
      * @param string     $code      Unique garage code (S/C/E).
      * @param string     $type      Garage type key.
      * @param float      $dailyRate Daily rental tariff.
-     * @param float|null $kwhPrice  Electricity tariff per kWh for EV garages.
+     * @param float|null $kwhPrice  Electricity price per kWh for EV garages.
      *
-     * @return Garage Persisted Garage model.
+     * @return Garage Saved Garage model.
      */
     private function createGarage(
         string $code = 'C001',
@@ -118,11 +117,11 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Verify a normal daily booking calculates exact base fee, sets end_date, and marks the garage used.
+     * Check normal daily booking saves the right end date, cost, and marks the garage as used.
      *
      * @return void
      */
-    public function test_create_rental_normal_daily_booking(): void
+    public function test_daily_rental_booking(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 1, 10));
 
@@ -149,12 +148,11 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Verify an EV parked in an EV garage (E) computes charging fee and adds it to total_cost,
-     * while an EV parked in a standard car garage (C) incurs zero charging fee without requiring battery input.
+     * Check EV charges battery fee in E garage, while EV in normal C garage pays Rp 0 charging fee.
      *
      * @return void
      */
-    public function test_ev_charging_applies_in_e_garage_and_skips_in_normal_car_garage(): void
+    public function test_ev_charging_in_ev_vs_normal_garage(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 11, 21));
 
@@ -196,12 +194,11 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Verify inline new_vehicle booking persists normalized uppercase plate numbers atomically with the rental,
-     * and leaves plate/battery null for a bicycle (sepeda).
+     * Check inline vehicle registration saves uppercase motorbike plates and keeps bicycle plate/kWh null.
      *
      * @return void
      */
-    public function test_inline_new_vehicle_creates_vehicle_atomically_with_rental(): void
+    public function test_add_new_vehicle_during_booking(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 11, 21));
 
@@ -244,12 +241,11 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Verify boundary calendar-month durations: 29-day leap Feb monthly (25x), 27-day non-leap Feb daily limit,
-     * and 31-day Jan auto-resolved monthly rate.
+     * Check real calendar-month limits across leap Feb (29d), Jan (31d), and non-leap Feb (max 27d daily).
      *
      * @return void
      */
-    public function test_calendar_month_boundaries_for_leap_feb_non_leap_feb_and_january(): void
+    public function test_calendar_month_limits(): void
     {
         Carbon::setTestNow(Carbon::create(2024, 2, 1));
         $renter = $this->createRenter('1');
@@ -321,11 +317,11 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Verify extendRental supports >1 month extensions without a day cap for both daily and monthly contracts.
+     * Check Admin extensions have no max day limit for both daily and monthly contracts.
      *
      * @return void
      */
-    public function test_extend_rental_supports_uncapped_days_for_daily_and_monthly_rentals(): void
+    public function test_extend_rental_without_day_limit(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 11, 1));
 
@@ -361,17 +357,17 @@ class RentalServiceTest extends TestCase
         $this->assertEqualsWithDelta(2250000.0, (float) $dailyExtension->extension_cost, 0.001);
         $this->assertSame('2026-12-26', $dailyRental->fresh()->end_date->toDateString());
 
-        // Monthly snapshot daily rate = 1,250,000 / 25 = 50,000/day -> 10 added days = 500,000.
+        // Monthly daily rate = 1,250,000 / 25 = 50,000/day -> 10 added days = 500,000.
         $this->assertSame(10, $monthlyExtension->added_days);
         $this->assertEqualsWithDelta(500000.0, (float) $monthlyExtension->extension_cost, 0.001);
     }
 
     /**
-     * Verify calculateEvCharging handles full/empty edge cases and rejects out-of-range battery parameters.
+     * Check EV battery charging edge cases (full and empty) and invalid battery levels.
      *
      * @return void
      */
-    public function test_calculate_ev_charging_edge_and_invalid_cases(): void
+    public function test_ev_charging_formula_bounds(): void
     {
         $this->assertEqualsWithDelta(0.0, $this->rentalService->calculateEvCharging(80.0, 80.0, 2500.0), 0.001);
         $this->assertEqualsWithDelta(200000.0, $this->rentalService->calculateEvCharging(80.0, 0.0, 2500.0), 0.001);
@@ -393,12 +389,11 @@ class RentalServiceTest extends TestCase
     }
 
     /**
-     * Verify invalid dates, over-month daily requests, incompatible garages, overlaps, missing EV battery,
-     * and failed inline vehicle transactions throw InvalidArgumentException without saving orphaned vehicles.
+     * Check invalid bookings and extensions throw errors cleanly without saving leftover inline vehicles.
      *
      * @return void
      */
-    public function test_create_and_extend_reject_invalid_bookings_without_orphaning_inline_vehicles(): void
+    public function test_invalid_bookings_and_extensions_fail_cleanly(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 4, 1));
 
@@ -412,7 +407,7 @@ class RentalServiceTest extends TestCase
 
         $beforeVehicleCount = Vehicle::count();
 
-        // 1. Failed inline new vehicle checks (incompatible garage & duplicate plate) leave zero orphan vehicles.
+        // Failed inline vehicles (wrong garage type or duplicate plate) must not leave leftover rows.
         try {
             $this->rentalService->createRental([
                 'user_id' => $renter->id,
@@ -451,7 +446,6 @@ class RentalServiceTest extends TestCase
             $this->assertSame($beforeVehicleCount, Vehicle::count());
         }
 
-        // 2. Past start date, >month daily duration in 30-day April, and missing EV remaining kWh.
         $invalidCreatePayloads = [
             [
                 'user_id' => $renter->id,
@@ -491,7 +485,6 @@ class RentalServiceTest extends TestCase
             }
         }
 
-        // 3. Seed an active booking and assert garage overlap, vehicle overlap, and invalid extension dates fail.
         $activeRental = $this->rentalService->createRental([
             'user_id' => $renter->id,
             'vehicle_id' => $car->id,
@@ -502,7 +495,7 @@ class RentalServiceTest extends TestCase
             'payment_proof_path' => 'proofs/active.jpg',
         ]);
 
-        // Future booking on same garage starting 2026-04-15 blocks extending activeRental past 2026-04-15.
+        // Future booking on C001 starting 2026-04-15 blocks overlapping extensions.
         $otherCar = $this->createVehicle($otherRenter, 'mobil', 'L 3333 CD');
         $this->rentalService->createRental([
             'user_id' => $otherRenter->id,
@@ -514,7 +507,6 @@ class RentalServiceTest extends TestCase
             'payment_proof_path' => 'proofs/future.jpg',
         ]);
 
-        // Garage overlap check
         try {
             $this->rentalService->createRental([
                 'user_id' => $otherRenter->id,
@@ -530,7 +522,6 @@ class RentalServiceTest extends TestCase
             $this->assertStringContainsString('garage', strtolower($exception->getMessage()));
         }
 
-        // Same vehicle overlap on a different available garage
         try {
             $this->rentalService->createRental([
                 'user_id' => $renter->id,
@@ -546,7 +537,6 @@ class RentalServiceTest extends TestCase
             $this->assertStringContainsString('vehicle', strtolower($exception->getMessage()));
         }
 
-        // Extension on same date (not strictly after end_date)
         try {
             $this->rentalService->extendRental($activeRental->id, '2026-04-11', 'proofs/ext_bad.jpg');
             $this->fail('Expected invalid extension end date exception.');
@@ -554,7 +544,6 @@ class RentalServiceTest extends TestCase
             $this->assertNotEmpty($exception->getMessage());
         }
 
-        // Extension colliding with future booking on C001
         $this->expectException(InvalidArgumentException::class);
         $this->rentalService->extendRental($activeRental->id, '2026-04-16', 'proofs/ext_overlap.jpg');
     }

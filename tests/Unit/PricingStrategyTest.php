@@ -9,17 +9,17 @@ use App\Domain\Pricing\MonthlyPricingStrategy;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Verifies daily and monthly pricing strategy calculations (normal and boundary cases)
- * to ensure base rental fee formulas remain isolated from persistence logic.
+ * Check daily and monthly pricing formulas independently from the database
+ * so base rental fee math stays accurate across durations.
  */
 class PricingStrategyTest extends TestCase
 {
     /**
-     * Verify DailyPricingStrategy multiplies rented days by the garage daily rate for normal durations.
+     * Check normal daily rate calculation (days multiplied by garage daily rate).
      *
      * @return void
      */
-    public function test_daily_pricing_calculates_exact_day_rate_total(): void
+    public function test_daily_rate_calculation(): void
     {
         $strategy = new DailyPricingStrategy();
 
@@ -27,11 +27,11 @@ class PricingStrategyTest extends TestCase
     }
 
     /**
-     * Verify DailyPricingStrategy accurately calculates the minimum 1-day rental boundary.
+     * Check the shortest valid booking boundary (1 day).
      *
      * @return void
      */
-    public function test_daily_pricing_handles_single_day_minimum_boundary(): void
+    public function test_single_day_rental(): void
     {
         $strategy = new DailyPricingStrategy();
 
@@ -39,11 +39,11 @@ class PricingStrategyTest extends TestCase
     }
 
     /**
-     * Verify MonthlyPricingStrategy bills a flat 25x multiplier regardless of calendar month length (28-31 days).
+     * Check monthly pricing always bills 25x daily rate no matter how many days are in the month (28-31).
      *
      * @return void
      */
-    public function test_monthly_pricing_applies_twenty_five_day_multiplier_across_month_lengths(): void
+    public function test_monthly_rate_always_uses_25x_multiplier(): void
     {
         $strategy = new MonthlyPricingStrategy();
 

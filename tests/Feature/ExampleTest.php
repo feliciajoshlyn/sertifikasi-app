@@ -7,16 +7,16 @@ namespace Tests\Feature;
 use Tests\TestCase;
 
 /**
- * Verifies entry navigation routing redirects unauthenticated visitors to the login screen.
+ * Check guest visitors hitting the home page get redirected to the login screen.
  */
 class ExampleTest extends TestCase
 {
     /**
-     * Verify root path redirects guests to login and the login page renders HTTP 200.
+     * Check unauthenticated GET / redirects to /login and /login loads with HTTP 200.
      *
      * @return void
      */
-    public function test_unauthenticated_root_redirects_to_login(): void
+    public function test_guest_is_redirected_to_login(): void
     {
         $response = $this->get('/');
 

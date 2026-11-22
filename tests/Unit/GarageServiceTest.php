@@ -15,8 +15,8 @@ use InvalidArgumentException;
 use Tests\TestCase;
 
 /**
- * Verifies GarageService sequential batch creation (S/C/E codes), EV-to-garage compatibility rules,
- * availability sorting via usort(), and invalid-input exception guards.
+ * Check GarageService rules for S/C/E code generation, vehicle compatibility,
+ * availability filtering, and input validation.
  */
 class GarageServiceTest extends TestCase
 {
@@ -25,7 +25,7 @@ class GarageServiceTest extends TestCase
     private GarageService $garageService;
 
     /**
-     * Initialize a fresh GarageService instance before each test.
+     * Prepare a fresh GarageService instance before each test.
      *
      * @return void
      */
@@ -36,11 +36,11 @@ class GarageServiceTest extends TestCase
     }
 
     /**
-     * Verify createBatch generates sequential S/C/E codes and only stores kwh_price for EV garages.
+     * Check sequential S/C/E batch codes and ensure only EV garages keep kwh_price.
      *
      * @return void
      */
-    public function test_create_batch_generates_sequential_codes_and_normalizes_kwh_price(): void
+    public function test_create_batch_codes_and_kwh_price(): void
     {
         $firstBatch = $this->garageService->createBatch('sepeda', 3, 15000.0, 2500.0);
         $secondBatch = $this->garageService->createBatch('sepeda', 2, 15000.0);
@@ -59,12 +59,11 @@ class GarageServiceTest extends TestCase
     }
 
     /**
-     * Verify vehicle-to-garage compatibility allows EVs in both standard car (C) and EV (E) garages
-     * while restricting standard cars to C garages and bikes/motorcycles to S garages.
+     * Check EV can use both C and E garages while regular cars stay limited to C garages.
      *
      * @return void
      */
-    public function test_compatibility_mapping_enforces_vehicle_and_garage_rules(): void
+    public function test_vehicle_and_garage_compatibility(): void
     {
         $this->assertSame(['sepeda'], GarageService::garageTypesForVehicle('sepeda'));
         $this->assertSame(['sepeda'], GarageService::garageTypesForVehicle('sepeda_motor'));
@@ -80,12 +79,11 @@ class GarageServiceTest extends TestCase
     }
 
     /**
-     * Verify getAvailableByVehicleType excludes overlapping bookings, includes non-overlapping ones,
-     * includes both C and E garages for EVs, and returns results sorted by code ascending.
+     * Check available garage list skips overlapping rentals, keeps free ones, and sorts codes A-Z.
      *
      * @return void
      */
-    public function test_get_available_by_vehicle_type_filters_overlaps_and_sorts_by_code(): void
+    public function test_available_garages_filter_overlaps_and_sort(): void
     {
         $renter = User::create([
             'nik' => '3578000000000001',
@@ -107,7 +105,7 @@ class GarageServiceTest extends TestCase
         [$e1, $e2] = $this->garageService->createBatch('mobil_listrik', 2, 75000.0, 2500.0);
         [$c1, $c2] = $this->garageService->createBatch('mobil', 2, 50000.0);
 
-        // Overlaps 2026-11-10..2026-11-15 so C001 must be excluded.
+        // Overlaps 2026-11-10..2026-11-15 so C001 cannot be picked.
         Rental::create([
             'user_id' => $renter->id,
             'vehicle_id' => $carVehicle->id,
@@ -122,7 +120,7 @@ class GarageServiceTest extends TestCase
             'payment_proof_path' => 'proofs/overlap.jpg',
         ]);
 
-        // Non-overlapping past booking so C002 remains available for 2026-11-10..2026-11-15.
+        // Ended earlier so C002 is free on 2026-11-12..2026-11-14.
         Rental::create([
             'user_id' => $renter->id,
             'vehicle_id' => $carVehicle->id,
@@ -145,11 +143,11 @@ class GarageServiceTest extends TestCase
     }
 
     /**
-     * Verify sequence boundary 999 succeeds and getAvailableByVehicleType returns empty when all compatible units are booked.
+     * Check sequence 999 works as the max code and full garages return an empty array.
      *
      * @return void
      */
-    public function test_boundary_sequence_999_succeeds_and_fully_booked_returns_empty_array(): void
+    public function test_sequence_999_limit_and_no_available_garages(): void
     {
         $lastValid = Garage::create([
             'code' => 'S998',
@@ -196,12 +194,11 @@ class GarageServiceTest extends TestCase
     }
 
     /**
-     * Verify createBatch rejects invalid counts, non-positive daily rates, missing/zero EV kWh prices,
-     * and batch additions that would exceed the 999 sequence code limit.
+     * Check invalid count, zero rate, missing EV kWh price, and >999 code overflow throw errors cleanly.
      *
      * @return void
      */
-    public function test_create_batch_rejects_invalid_inputs_and_sequence_overflow(): void
+    public function test_create_batch_rejects_invalid_inputs(): void
     {
         $invalidCalls = [
             fn (): array => $this->garageService->createBatch('sepeda', 0, 10000.0),

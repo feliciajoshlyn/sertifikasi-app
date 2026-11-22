@@ -16,8 +16,8 @@ use InvalidArgumentException;
 use Tests\TestCase;
 
 /**
- * Verifies ReportService SQL JOIN aggregations (monthly, daily, garage type, and renter),
- * non-duplication of parent totals when multiple extensions exist, empty states, and invalid month guards.
+ * Check ReportService SQL JOIN queries (monthly, daily, by garage type, and by renter)
+ * so totals stay accurate without double-counting extensions.
  */
 class ReportServiceTest extends TestCase
 {
@@ -26,7 +26,7 @@ class ReportServiceTest extends TestCase
     private ReportService $reportService;
 
     /**
-     * Initialize a fresh ReportService instance before each test.
+     * Prepare a fresh ReportService instance before each test.
      *
      * @return void
      */
@@ -37,7 +37,7 @@ class ReportServiceTest extends TestCase
     }
 
     /**
-     * Seed a realistic set of multi-month rentals and extensions across renters and garage types.
+     * Insert sample rentals and extensions across renters and garage types for report tests.
      *
      * @return void
      */
@@ -85,7 +85,7 @@ class ReportServiceTest extends TestCase
         $eGarage = Garage::create(['code' => 'E001', 'type' => 'mobil_listrik', 'daily_rate' => 75000.0, 'kwh_price' => 2500.0, 'status' => 'used']);
         $sGarage = Garage::create(['code' => 'S001', 'type' => 'sepeda', 'daily_rate' => 10000.0, 'status' => 'used']);
 
-        // Jan rental by Alpha with TWO extensions (100k + 150k = 250k) to verify no double-counting.
+        // Jan rental by Alpha with 2 extensions (100k + 150k) to verify parent rental isn't counted twice.
         $janRental = Rental::create([
             'user_id' => $renterA->id,
             'vehicle_id' => $car->id,
@@ -117,7 +117,6 @@ class ReportServiceTest extends TestCase
             'payment_proof_path' => 'proofs/jan_ext2.jpg',
         ]);
 
-        // Two November rentals by Beta (EV + Sepeda).
         Rental::create([
             'user_id' => $renterB->id,
             'vehicle_id' => $ev->id,
@@ -149,11 +148,11 @@ class ReportServiceTest extends TestCase
     }
 
     /**
-     * Verify monthly report aggregates correctly by month without duplicating totals across multiple extensions.
+     * Check monthly report sums revenue correctly even when one rental has multiple extensions.
      *
      * @return void
      */
-    public function test_get_monthly_report_aggregates_without_extension_duplication(): void
+    public function test_monthly_report_with_multiple_extensions(): void
     {
         $this->seedReportDataset();
 
@@ -177,11 +176,11 @@ class ReportServiceTest extends TestCase
     }
 
     /**
-     * Verify daily report returns chronological per-date rows scoped to the requested year and month.
+     * Check daily report shows only the chosen month in date order.
      *
      * @return void
      */
-    public function test_get_daily_report_filters_month_and_orders_chronologically(): void
+    public function test_daily_report_for_selected_month(): void
     {
         $this->seedReportDataset();
 
@@ -195,11 +194,11 @@ class ReportServiceTest extends TestCase
     }
 
     /**
-     * Verify garage-type and renter reports join related tables and rank renters by descending revenue.
+     * Check garage-type totals and renter totals ranked from highest to lowest spender.
      *
      * @return void
      */
-    public function test_get_report_by_garage_type_and_renter(): void
+    public function test_report_by_garage_type_and_renter(): void
     {
         $this->seedReportDataset();
 
@@ -223,12 +222,11 @@ class ReportServiceTest extends TestCase
     }
 
     /**
-     * Verify all report methods return an empty array when the database has no matching rentals,
-     * and getDailyReport rejects months outside 1..12.
+     * Check empty tables return an empty list and invalid months (0 or 13) throw an error.
      *
      * @return void
      */
-    public function test_empty_dataset_edge_case_and_invalid_month_guard(): void
+    public function test_empty_reports_and_invalid_month(): void
     {
         $this->assertSame([], $this->reportService->getMonthlyReport(2026));
         $this->assertSame([], $this->reportService->getDailyReport(2026, 11));
